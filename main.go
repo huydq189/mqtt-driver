@@ -56,10 +56,15 @@ func main() {
 	GPS[8] = LatLng{LAT: 10.474085, LON: 107.248610}
 	GPS[9] = LatLng{LAT: 10.477209, LON: 107.297322}
 
+	// var f = func(c MQTT.Client, msg MQTT.Message) {
+	// 	fmt.Printf("* [%s] %s\n", msg.Topic(), string(msg.Payload()))
+	// }
 	// client := mqtt.NewClient(opts)
 	for i := 0; i < len(GPS); i++ {
 		data, _ := json.Marshal(&GPS[i])
 		client.Publish("/salt.coffee189@gmail.com/test", string(data))
-		time.Sleep(1 * time.Second)
+		// client.SubscribeDefault("/salt.coffee189@gmail.com/test")
+		// client.Subscribe("/salt.coffee189@gmail.com/test", f, 0)
+		time.Sleep(3 * time.Second)
 	}
 }

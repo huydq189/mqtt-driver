@@ -16,6 +16,12 @@ var (
 	errMQTTDisconnected = errors.New("mqtt: disconnected")
 )
 
+// Client interface
+type Client = mqtt.Client
+
+// Message interface
+type Message = mqtt.Message
+
 // MQTT is the implementation of the MQTT client
 type MQTT struct {
 	host            string
@@ -110,7 +116,7 @@ func (m *MQTT) connect() {
 	m.connectToken = m.client.Connect().(*mqtt.ConnectToken)
 	if m.connectToken.Wait() && m.connectToken.Error() != nil {
 		if !m.connecting {
-			log.Fatalf("MQTT client %s", m.connectToken.Error())
+			log.Printf("MQTT client %s", m.connectToken.Error())
 			m.retryConnect()
 		}
 	} else {
@@ -128,29 +134,23 @@ func (m *MQTT) Stop() error {
 }
 
 // Subscribe - subcribe to a topic
-func (m *MQTT) Subscribe(topic string) error {
+func (m *MQTT) Subscribe(topic string, handler mqtt.MessageHandler, qos byte) error {
 	if !m.client.IsConnected() {
 		return errMQTTDisconnected
 	}
-	token := m.client.Subscribe(topic, m.subscriptionQos, func(client mqtt.Client, msg mqtt.Message) {
-		fmt.Printf("* [%s] %s\n", msg.Topic(), string(msg.Payload()))
-	})
+	token := m.client.Subscribe(topic, qos, handler)
 	if token.WaitTimeout(2) && token.Error() != nil {
 		return token.Error()
 	}
 	return nil
 }
 
-// SubscribeQOS - subcribe to a topic with QOS
-func (m *MQTT) SubscribeQOS(topic string, qos *byte) error {
+// SubscribeDefault - SubscribeDefault to a topic with QOS
+func (m *MQTT) SubscribeDefault(topic string) error {
 	if !m.client.IsConnected() {
 		return errMQTTDisconnected
 	}
-	var q = m.subscriptionQos
-	if qos != nil {
-		q = *qos
-	}
-	token := m.client.Subscribe(topic, q, func(client mqtt.Client, msg mqtt.Message) {
+	token := m.client.Subscribe(topic, m.subscriptionQos, func(client mqtt.Client, msg mqtt.Message) {
 		fmt.Printf("* [%s] %s\n", msg.Topic(), string(msg.Payload()))
 	})
 	if token.WaitTimeout(2) && token.Error() != nil {
@@ -186,16 +186,12 @@ func (m *MQTT) Publish(topic, message string) error {
 }
 
 // PublishQOS - qos
-func (m *MQTT) PublishQOS(topic, message string, qos *byte) error {
+func (m *MQTT) PublishQOS(topic, message string, qos byte) error {
 	if !m.client.IsConnected() {
 		return errMQTTDisconnected
 	}
-	var q = m.subscriptionQos
-	if qos != nil {
-		q = *qos
-	}
 	// Send - Publish a message to Topic
-	token := m.client.Publish(topic, q, false, message)
+	token := m.client.Publish(topic, qos, false, message)
 	if token.WaitTimeout(2) && token.Error() != nil {
 		return token.Error()
 	}
@@ -204,7 +200,7 @@ func (m *MQTT) PublishQOS(topic, message string, qos *byte) error {
 
 // RetryConnect - reconnect after time
 func (m *MQTT) retryConnect() {
-	log.Fatal("MQTT client starting reconnect procedure in background")
+	log.Printf("MQTT client starting reconnect procedure in background")
 	m.connecting = true
 	ticker := time.NewTicker(time.Second * 5)
 	go func() {
@@ -220,7 +216,7 @@ func (m *MQTT) retryConnect() {
 
 //call retryConnect
 func (m *MQTT) connectionLostHandler(c mqtt.Client, err error) {
-	log.Fatalf("MQTT client lost connection: %v", err)
+	log.Printf("MQTT client lost connection: %v", err)
 	m.disconnected = true
 	m.retryConnect()
 }
