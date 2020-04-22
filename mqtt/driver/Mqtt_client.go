@@ -49,39 +49,33 @@ func (m *MQTT) getProtocol() string {
 	return "tcp"
 }
 
-//Init (path string) error
-func Init(path string) IM.IMQTTClient {
+//InitConnection (path string) - Init a mqtt client connection - best to use with publish only
+func InitConnection(path string) IM.IMQTTClient {
 	MQClient := InitMQTTClientOptions(path)
-	err := MQClient.CreateMQTTClient()
+	_, err := MQClient.Start()
 	if err != nil {
-		log.Fatal(err)
-		return nil
-	}
-	_, err1 := MQClient.Start()
-	if err1 != nil {
 		log.Fatal(err)
 		return nil
 	}
 	return MQClient
 }
 
-//InitMQTTClientOptions - init MQTT options
+//InitMQTTClientOptions - Init MQTT options
 func InitMQTTClientOptions(path string) IM.IMQTTClient {
 	viper.SetConfigFile(path)
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalln(err)
 	}
-	//DEBUG - Debugging
+	// DEBUG - Debugging
 	// mqtt.DEBUG = log.New(os.Stdout, "", 0)
-	//ERROR - Debugging
+	// ERROR - Debugging
 	// mqtt.ERROR = log.New(os.Stdout, "", 0)
 	connID := uuid.New().String()
-
 	mqttClient := &MQTT{
 		host:            viper.GetString(`mqtt.host`),
 		port:            viper.GetInt(`mqtt.port`),
 		prefix:          viper.GetString(`mqtt.prefix`),
-		clientID:        viper.GetString(`mqtt.clientID`) + "-" + connID,
+		clientID:        viper.GetString(`mqtt.clientID`) + connID,
 		subscriptionQos: byte(viper.GetInt(`mqtt.subscriptionQos`)),
 		persistent:      viper.GetBool(`mqtt.persistent`),
 		order:           viper.GetBool(`mqtt.order`),
@@ -108,6 +102,7 @@ func InitMQTTClientOptions(path string) IM.IMQTTClient {
 	//mqttClient.opts.SetAutoReconnect(true)
 	mqttClient.opts.SetCleanSession(!mqttClient.persistent)
 	mqttClient.opts.SetOrderMatters(mqttClient.order)
+	mqttClient.opts.SetAutoReconnect(false)
 	mqttClient.opts.SetKeepAlive(time.Duration(mqttClient.keepAliveSec) * time.Second)
 	mqttClient.opts.SetPingTimeout(time.Duration(mqttClient.pingTimeoutSec) * time.Second)
 	mqttClient.opts.SetResumeSubs(mqttClient.resumesub)
@@ -115,19 +110,33 @@ func InitMQTTClientOptions(path string) IM.IMQTTClient {
 	return mqttClient
 }
 
-//CreateMQTTClient - Create a new MQTT client
-func (m *MQTT) CreateMQTTClient() error {
-	if m.opts == nil {
-		return errors.New("No opstion defined")
-	}
-	m.client = mqtt.NewClient(m.opts)
-	return nil
+//SetOnConnectHandler - Set handler to resume your action after lost connection if persistent is false
+func (m *MQTT) SetOnConnectHandler(handler mqtt.OnConnectHandler) *mqtt.ClientOptions {
+	m.opts = m.opts.SetOnConnectHandler(handler)
+	return m.opts
+}
+
+//SetDefaultPublishHandler - Set handler to keep all your message while lost connection and reconnect between keepalive time if persistent is true
+func (m *MQTT) SetDefaultPublishHandler(handler mqtt.MessageHandler) *mqtt.ClientOptions {
+	m.opts = m.opts.SetDefaultPublishHandler(handler)
+	return m.opts
 }
 
 // Start running the MQTT client
 func (m *MQTT) Start() (bool, error) {
-	log.Printf("Starting MQTT client on %s://%s:%v with Persistence:%v, OrderMatters:%v, KeepAlive:%v, PingTimeout:%v, QOS:%v\n",
-		m.getProtocol(), m.host, m.port, m.persistent, m.order, m.keepAliveSec, m.pingTimeoutSec, m.subscriptionQos)
+	//CreateMQTTClient - Create a new MQTT client
+	if m.opts == nil {
+		return false, errors.New("No opstion defined")
+	}
+	if m.opts.OnConnect == nil && m.opts.CleanSession == true {
+		log.Println("[Warning] Detect persistent = false, OnConnect hasn't set yet: Please set OnConnectHandler if you want to resume your action ex:subcription(subscribe to topic) after lost connection ")
+	}
+	if m.opts.DefaultPublishHandler == nil && m.opts.CleanSession == false {
+		log.Println("[Warning] Detect persistent = true, DefaultPublishHandler hasn't set yet: Please set DefaultPublishhandler if you want to keep all your message arrived while lost connection")
+	}
+	m.client = mqtt.NewClient(m.opts)
+	log.Printf("Starting MQTT client on %s://%s:%v with Persistence:%v, OrderMatters:%v, KeepAlive:%v, PingTimeout:%v, QOS:%v, Resumesubs:%v\n",
+		m.getProtocol(), m.host, m.port, m.persistent, m.order, m.keepAliveSec, m.pingTimeoutSec, m.subscriptionQos, m.resumesub)
 	return m.connect()
 }
 
@@ -242,6 +251,7 @@ func (m *MQTT) retryConnect() (bool, error) {
 		select {
 		// Got a timeout! fail with a timeout error
 		case <-timeout:
+			log.Fatalf("Client tried to connect but time out and failed")
 			return false, errors.New("timed out")
 		// Got a tick, we should check on doSomething()
 		case <-tick:

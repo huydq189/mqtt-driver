@@ -20,7 +20,7 @@
         "host": "mqtt.dioty.co",
         "port": "1883",
         "prefix": "",
-        "clientID": "huydo189",
+        "clientID": "",
         "subscriptionQos": "0",
         "persistent": "false",
         "order": "true",
@@ -33,6 +33,6 @@
         "resumesub": "true",
         "keepAliveSec": "30",
         "pingTimeoutSec": "10",
-        "timeout": "120"
+        "timeout": "3600"
     }
 }
