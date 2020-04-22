@@ -71,11 +71,15 @@ func InitMQTTClientOptions(path string) IM.IMQTTClient {
 	// ERROR - Debugging
 	// mqtt.ERROR = log.New(os.Stdout, "", 0)
 	connID := uuid.New().String()
+	userID := viper.GetString(`mqtt.clientID`)
+	if userID == "" {
+		userID = connID
+	}
 	mqttClient := &MQTT{
 		host:            viper.GetString(`mqtt.host`),
 		port:            viper.GetInt(`mqtt.port`),
 		prefix:          viper.GetString(`mqtt.prefix`),
-		clientID:        viper.GetString(`mqtt.clientID`) + connID,
+		clientID:        userID,
 		subscriptionQos: byte(viper.GetInt(`mqtt.subscriptionQos`)),
 		persistent:      viper.GetBool(`mqtt.persistent`),
 		order:           viper.GetBool(`mqtt.order`),

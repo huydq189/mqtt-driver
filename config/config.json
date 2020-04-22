@@ -20,7 +20,7 @@
         "host": "mqtt.dioty.co",
         "port": "1883",
         "prefix": "",
-        "clientID": "",
+        "clientID": "huydo189",
         "subscriptionQos": "0",
         "persistent": "false",
         "order": "true",
