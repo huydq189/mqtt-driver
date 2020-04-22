@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
+	IM "bitbucket.org/mqttgis/mqtt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/google/uuid"
 	"github.com/spf13/viper"
@@ -35,6 +35,8 @@ type MQTT struct {
 	order           bool
 	connecting      bool
 	disconnected    bool
+	resumesub       bool
+	timeout         int
 	client          mqtt.Client
 	opts            *mqtt.ClientOptions
 	connectToken    *mqtt.ConnectToken
@@ -47,16 +49,32 @@ func (m *MQTT) getProtocol() string {
 	return "tcp"
 }
 
+//Init (path string) error
+func Init(path string) IM.IMQTTClient {
+	MQClient := InitMQTTClientOptions(path)
+	err := MQClient.CreateMQTTClient()
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
+	_, err1 := MQClient.Start()
+	if err1 != nil {
+		log.Fatal(err)
+		return nil
+	}
+	return MQClient
+}
+
 //InitMQTTClientOptions - init MQTT options
-func InitMQTTClientOptions() *MQTT {
-	viper.SetConfigFile(`./config/config.json`)
+func InitMQTTClientOptions(path string) IM.IMQTTClient {
+	viper.SetConfigFile(path)
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalln(err)
 	}
 	//DEBUG - Debugging
-	mqtt.DEBUG = log.New(os.Stdout, "", 0)
+	// mqtt.DEBUG = log.New(os.Stdout, "", 0)
 	//ERROR - Debugging
-	mqtt.ERROR = log.New(os.Stdout, "", 0)
+	// mqtt.ERROR = log.New(os.Stdout, "", 0)
 	connID := uuid.New().String()
 
 	mqttClient := &MQTT{
@@ -74,6 +92,8 @@ func InitMQTTClientOptions() *MQTT {
 		privateKeyPath:  viper.GetString(`mqtt.privateKeyPath`),
 		keepAliveSec:    viper.GetInt(`mqtt.keepAliveSec`),
 		pingTimeoutSec:  viper.GetInt(`mqtt.pingTimeoutSec`),
+		timeout:         viper.GetInt(`mqtt.timeout`),
+		resumesub:       viper.GetBool(`mqtt.resumesub`),
 	}
 	mqttClient.opts = mqtt.NewClientOptions()
 	// CreateMQTTClient creates a new MQTT client
@@ -85,41 +105,47 @@ func InitMQTTClientOptions() *MQTT {
 	}
 	mqttClient.opts.AddBroker(fmt.Sprintf("%s://%s:%v", mqttClient.getProtocol(), mqttClient.host, mqttClient.port))
 	mqttClient.opts.SetClientID(mqttClient.clientID)
+	//mqttClient.opts.SetAutoReconnect(true)
 	mqttClient.opts.SetCleanSession(!mqttClient.persistent)
 	mqttClient.opts.SetOrderMatters(mqttClient.order)
 	mqttClient.opts.SetKeepAlive(time.Duration(mqttClient.keepAliveSec) * time.Second)
 	mqttClient.opts.SetPingTimeout(time.Duration(mqttClient.pingTimeoutSec) * time.Second)
+	mqttClient.opts.SetResumeSubs(mqttClient.resumesub)
 	mqttClient.opts.SetConnectionLostHandler(mqttClient.connectionLostHandler)
 	return mqttClient
 }
 
 //CreateMQTTClient - Create a new MQTT client
-func (m *MQTT) CreateMQTTClient() *MQTT {
+func (m *MQTT) CreateMQTTClient() error {
 	if m.opts == nil {
-		log.Fatalln("No options created")
-		return nil
+		return errors.New("No opstion defined")
 	}
 	m.client = mqtt.NewClient(m.opts)
-	return m
+	return nil
 }
 
 // Start running the MQTT client
-func (m *MQTT) Start() {
+func (m *MQTT) Start() (bool, error) {
 	log.Printf("Starting MQTT client on %s://%s:%v with Persistence:%v, OrderMatters:%v, KeepAlive:%v, PingTimeout:%v, QOS:%v\n",
 		m.getProtocol(), m.host, m.port, m.persistent, m.order, m.keepAliveSec, m.pingTimeoutSec, m.subscriptionQos)
-	m.connect()
+	return m.connect()
 }
 
-func (m *MQTT) connect() {
+func (m *MQTT) connect() (bool, error) {
 	m.connectToken = m.client.Connect().(*mqtt.ConnectToken)
+	var res bool
+	var err error
 	if m.connectToken.Wait() && m.connectToken.Error() != nil {
 		if !m.connecting {
 			log.Printf("MQTT client %s", m.connectToken.Error())
-			m.retryConnect()
+			res, err = m.retryConnect()
+
 		}
 	} else {
 		fmt.Println("Connected with broker")
+		res, err = true, nil
 	}
+	return res, err
 }
 
 // Stop the MQTT client
@@ -141,15 +167,16 @@ func (m *MQTT) Subscribe(topic string, handler mqtt.MessageHandler, qos byte) er
 }
 
 // SubscribeOC - Set options subcribe to a topic onconnect
-func (m *MQTT) SubscribeOC(topic string, handler mqtt.MessageHandler, qos byte) {
-	var f = func(c mqtt.Client) {
-		token := m.client.Subscribe(topic, m.subscriptionQos, handler)
-		if token.WaitTimeout(2) && token.Error() != nil {
-			log.Fatal(token.Error())
-		}
-	}
-	m.opts.SetOnConnectHandler(f)
-}
+// func (m *MQTT) SubscribeOC(topic string, handler mqtt.MessageHandler, qos byte) *mqtt.ClientOptions {
+// 	var f = func(c mqtt.Client) {
+// 		token := m.client.Subscribe(topic, m.subscriptionQos, handler)
+// 		if token.WaitTimeout(2) && token.Error() != nil {
+// 			log.Fatal(token.Error())
+// 		}
+// 	}
+// 	m.opts = m.opts.SetOnConnectHandler(f)
+// 	return m.opts
+// }
 
 // SubscribeD - SubscribeDefault to a topic with QOS
 func (m *MQTT) SubscribeD(topic string) error {
@@ -205,19 +232,27 @@ func (m *MQTT) PublishQOS(topic, message string, qos byte) error {
 }
 
 // RetryConnect - reconnect after time
-func (m *MQTT) retryConnect() {
+func (m *MQTT) retryConnect() (bool, error) {
 	log.Printf("MQTT client starting reconnect procedure in background")
 	m.connecting = true
-	ticker := time.NewTicker(time.Second * 5)
-	go func() {
-		for range ticker.C {
+	timeout := time.After(time.Duration(m.timeout) * time.Second)
+	tick := time.Tick(5000 * time.Millisecond)
+	// Keep trying until we're timed out or got a result or got an error
+	for {
+		select {
+		// Got a timeout! fail with a timeout error
+		case <-timeout:
+			return false, errors.New("timed out")
+		// Got a tick, we should check on doSomething()
+		case <-tick:
 			m.connect()
 			if m.client.IsConnected() {
-				ticker.Stop()
-				m.connecting = false
+				return true, nil
 			}
+			// doSomething() didn't work yet, but it didn't fail, so let's try again
+			// this will exit up to the for loop
 		}
-	}()
+	}
 }
 
 //call retryConnect

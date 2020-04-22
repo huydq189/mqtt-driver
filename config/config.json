@@ -7,30 +7,32 @@
         "dbname": "VTU_DTND"
     },
     "kong": {
-        "domain":"http://203.162.141.67:30000"
+        "domain": "http://203.162.141.67:30000"
     },
     "permission": {
-        "domain":"http://203.162.141.67:5004",
-        "checkValidTokenAPI":"/api/permissions/permission/checktoken"
-    }, 
+        "domain": "http://203.162.141.67:5004",
+        "checkValidTokenAPI": "/api/permissions/permission/checktoken"
+    },
     "log": {
-        "domain":"http://222.255.102.162:9200"
+        "domain": "http://222.255.102.162:9200"
     },
     "mqtt": {
-        "host":            "localhost",
-		"port":            "1883",
-		"prefix":          "",
-		"clientID":        "huydo189",
-		"subscriptionQos": "0",
-		"persistent":      "false",
-		"order":           "true",
-		"sslEnabled":      "false",
-		"username":        "",
-		"password":        "",
-		"caCertPath":      "",
-		"clientCertPath":  "",
-		"privateKeyPath":  "",
-		"keepAliveSec":    "30",
-		"pingTimeoutSec":  "10"
+        "host": "mqtt.dioty.co",
+        "port": "1883",
+        "prefix": "",
+        "clientID": "huydo189",
+        "subscriptionQos": "0",
+        "persistent": "false",
+        "order": "true",
+        "sslEnabled": "false",
+        "username": "salt.coffee189@gmail.com",
+        "password": "bf64fe27",
+        "caCertPath": "",
+        "clientCertPath": "",
+        "privateKeyPath": "",
+        "resumesub": "true",
+        "keepAliveSec": "30",
+        "pingTimeoutSec": "10",
+        "timeout": "120"
     }
 }
