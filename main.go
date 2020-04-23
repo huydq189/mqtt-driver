@@ -21,27 +21,18 @@ type LatLng struct {
 	LON float64 `json:"lon"`
 }
 
-//-------------------Persitent = true------------------------
 func onMessageHandler(client mqtt.Client, message mqtt.Message) {
 	fmt.Printf("Received message on topic: %s\nMessage: %s\n", message.Topic(), message.Payload())
 }
 
-//-------------------Persitent = false------------------------
 func onConnectHandler(client mqtt.Client) {
-	MQTTService.SubscribeD("/salt.coffee189@gmail.com/lin")
+	MQTTService.Subscribe("/salt.coffee189@gmail.com/huydo189", onMessageHandler, 1)
+	MQTTService.Publish("/salt.coffee189@gmail.com/device/phaotieu-xzxc", "Online", true)
 }
 
 //Khởi tạo
 func init() {
-
-	//Use this init if you just want to publish only
-	//MQTTService = mqttcon.InitConnection("./config/config.json")
-
-	//-------------------Persitent = false------------------------
-	MQTTService = mqttcon.InitMQTTClientOptions("./config/config.json")
-
-	//-------------------Persitent = true------------------------
-	//MQTTService = mqttcon.InitMQTTClientOptions("./config/config.json")
+	MQTTService = mqttcon.InitMQTTClientOptions("./config/client.json")
 }
 
 func main() {
@@ -55,14 +46,9 @@ func main() {
 	GPS[7] = LatLng{LAT: 10.496993, LON: 107.277607}
 	GPS[8] = LatLng{LAT: 10.474085, LON: 107.248610}
 	GPS[9] = LatLng{LAT: 10.477209, LON: 107.297322}
-
-	//-------------------Persitent = true------------------------
-	// MQTTService.SetDefaultPublishHandler(onMessageHandler)
-	// MQTTService.Start()
-
-	//-------------------Persitent = false------------------------
 	MQTTService.SetOnConnectHandler(onConnectHandler)
 	MQTTService.Start()
+	MQTTService.Subscribe("/salt.coffee189@gmail.com/huydo189", onMessageHandler, 1)
 	for i := 0; i < 100; i++ {
 		// data, _ := json.Marshal(&GPS[i])
 		// MQTTService.Publish("/salt.coffee189@gmail.com/huydo189", string(data))

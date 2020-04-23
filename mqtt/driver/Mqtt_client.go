@@ -33,6 +33,11 @@ type MQTT struct {
 	subscriptionQos byte
 	persistent      bool
 	order           bool
+	willEnabled     bool
+	willTopic       string
+	willPayload     string
+	willQos         byte
+	willRetained    bool
 	connecting      bool
 	disconnected    bool
 	resumesub       bool
@@ -43,21 +48,10 @@ type MQTT struct {
 }
 
 func (m *MQTT) getProtocol() string {
-	if m.sslEnabled == true {
+	if m.sslEnabled {
 		return "ssl"
 	}
 	return "tcp"
-}
-
-//InitConnection (path string) - Init a mqtt client connection - best to use with publish only
-func InitConnection(path string) IM.IMQTTClient {
-	MQClient := InitMQTTClientOptions(path)
-	_, err := MQClient.Start()
-	if err != nil {
-		log.Fatal(err)
-		return nil
-	}
-	return MQClient
 }
 
 //InitMQTTClientOptions - Init MQTT options
@@ -71,18 +65,19 @@ func InitMQTTClientOptions(path string) IM.IMQTTClient {
 	// ERROR - Debugging
 	// mqtt.ERROR = log.New(os.Stdout, "", 0)
 	connID := uuid.New().String()
-	userID := viper.GetString(`mqtt.clientID`)
-	if userID == "" {
-		userID = connID
-	}
 	mqttClient := &MQTT{
 		host:            viper.GetString(`mqtt.host`),
 		port:            viper.GetInt(`mqtt.port`),
 		prefix:          viper.GetString(`mqtt.prefix`),
-		clientID:        userID,
+		clientID:        viper.GetString(`mqtt.clientID`) + connID,
 		subscriptionQos: byte(viper.GetInt(`mqtt.subscriptionQos`)),
 		persistent:      viper.GetBool(`mqtt.persistent`),
 		order:           viper.GetBool(`mqtt.order`),
+		willEnabled:     viper.GetBool(`mqtt.WillEnabled`),
+		willTopic:       viper.GetString(`mqtt.WillTopic`),
+		willPayload:     viper.GetString(`mqtt.WillPayload`),
+		willQos:         byte(viper.GetInt(`mqtt.WillQos`)),
+		willRetained:    viper.GetBool(`mqtt.WillRetained`),
 		sslEnabled:      viper.GetBool(`mqtt.sslEnabled`),
 		username:        viper.GetString(`mqtt.username`),
 		password:        viper.GetString(`mqtt.password`),
@@ -106,6 +101,9 @@ func InitMQTTClientOptions(path string) IM.IMQTTClient {
 	//mqttClient.opts.SetAutoReconnect(true)
 	mqttClient.opts.SetCleanSession(!mqttClient.persistent)
 	mqttClient.opts.SetOrderMatters(mqttClient.order)
+	if mqttClient.willEnabled {
+		mqttClient.opts.SetWill(mqttClient.willTopic, mqttClient.willPayload, mqttClient.willQos, mqttClient.willRetained)
+	}
 	mqttClient.opts.SetAutoReconnect(false)
 	mqttClient.opts.SetKeepAlive(time.Duration(mqttClient.keepAliveSec) * time.Second)
 	mqttClient.opts.SetPingTimeout(time.Duration(mqttClient.pingTimeoutSec) * time.Second)
@@ -120,28 +118,23 @@ func (m *MQTT) SetOnConnectHandler(handler mqtt.OnConnectHandler) *mqtt.ClientOp
 	return m.opts
 }
 
-//SetDefaultPublishHandler - Set handler to keep all your message while lost connection and reconnect between keepalive time if persistent is true
-func (m *MQTT) SetDefaultPublishHandler(handler mqtt.MessageHandler) *mqtt.ClientOptions {
-	m.opts = m.opts.SetDefaultPublishHandler(handler)
-	return m.opts
-}
-
 // Start running the MQTT client
 func (m *MQTT) Start() (bool, error) {
 	//CreateMQTTClient - Create a new MQTT client
 	if m.opts == nil {
 		return false, errors.New("No opstion defined")
 	}
-	if m.opts.OnConnect == nil && m.opts.CleanSession == true {
+	if m.opts.OnConnect == nil && m.opts.CleanSession {
 		log.Println("[Warning] Detect persistent = false, OnConnect hasn't set yet: Please set OnConnectHandler if you want to resume your action ex:subcription(subscribe to topic) after lost connection ")
 	}
-	if m.opts.DefaultPublishHandler == nil && m.opts.CleanSession == false {
+	if m.opts.DefaultPublishHandler == nil && m.opts.CleanSession {
 		log.Println("[Warning] Detect persistent = true, DefaultPublishHandler hasn't set yet: Please set DefaultPublishhandler if you want to keep all your message arrived while lost connection")
 	}
 	m.client = mqtt.NewClient(m.opts)
 	log.Printf("Starting MQTT client on %s://%s:%v with Persistence:%v, OrderMatters:%v, KeepAlive:%v, PingTimeout:%v, QOS:%v, Resumesubs:%v\n",
 		m.getProtocol(), m.host, m.port, m.persistent, m.order, m.keepAliveSec, m.pingTimeoutSec, m.subscriptionQos, m.resumesub)
-	return m.connect()
+	boo, err := m.connect()
+	return boo, err
 }
 
 func (m *MQTT) connect() (bool, error) {
@@ -218,7 +211,7 @@ func (m *MQTT) UnSubscribe(topic string) error {
 }
 
 // Publish - Send messages to topic
-func (m *MQTT) Publish(topic, message string) error {
+func (m *MQTT) Publish(topic, message string, retained bool) error {
 	if !m.client.IsConnected() {
 		return errMQTTDisconnected
 	}
@@ -232,7 +225,7 @@ func (m *MQTT) Publish(topic, message string) error {
 }
 
 // PublishQOS - qos
-func (m *MQTT) PublishQOS(topic, message string, qos byte) error {
+func (m *MQTT) PublishQOS(topic, message string, retained bool, qos byte) error {
 	if !m.client.IsConnected() {
 		return errMQTTDisconnected
 	}

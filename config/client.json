@@ -1,0 +1,27 @@
+{
+    "mqtt": {
+        "host": "mqtt.dioty.co",
+        "port": "1883",
+        "prefix": "",
+        "clientID": "huydo189",
+        "subscriptionQos": "0",
+        "persistent": "true",
+        "order": "true",
+        "WillEnabled": "true",
+        "WillTopic": "/salt.coffee189@gmail.com/device/phaotieu-xzxc",
+        "WillPayload": "Offline",
+        "WillQos": "0",
+        "WillRetained": "true",
+        "sslEnabled": "false",
+        "username": "salt.coffee189@gmail.com",
+        "password": "bf64fe27",
+        "caCertPath": "",
+        "clientCertPath": "",
+        "privateKeyPath": "",
+        "resumesub": "false",
+        "store": "",
+        "keepAliveSec": "30",
+        "pingTimeoutSec": "10",
+        "timeout": "3600"
+    }
+}

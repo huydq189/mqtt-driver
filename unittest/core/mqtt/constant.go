@@ -11,7 +11,7 @@ type Test struct {
 	Message string
 }
 
-var pathconfig = `../../../config/config.json`
+var pathconfig = `../../../config/client.json`
 
 //MQTTService - test MQService
 var MQTTService = mqttconn.InitMQTTClientOptions(pathconfig)

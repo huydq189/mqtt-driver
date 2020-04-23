@@ -8,21 +8,10 @@ import (
 	//"time"
 )
 
-func TestCreateMQTTClient(t *testing.T) {
-	err := MQTTService.CreateMQTTClient()
-	if err != nil {
-		t.Errorf("Lỗi tạo client và clientoptions mqtt: %v", err)
-	}
-}
-
 func TestStart(t *testing.T) {
-	err := MQTTService.CreateMQTTClient()
+	_, err := MQTTService.Start()
 	if err != nil {
-		t.Errorf("Lỗi tạo client và clientoptions mqtt: %v", err)
-	}
-	_, err1 := MQTTService.Start()
-	if err1 != nil {
-		t.Errorf("Lỗi connect broker: %v", err)
+		t.Errorf("Lỗi khởi tạo mqtt: %v", err)
 	}
 }
 
