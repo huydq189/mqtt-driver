@@ -51,7 +51,7 @@ func main() {
 	MQTTService.Subscribe("/salt.coffee189@gmail.com/huydo189", onMessageHandler, 1)
 	for i := 0; i < 100; i++ {
 		// data, _ := json.Marshal(&GPS[i])
-		// MQTTService.Publish("/salt.coffee189@gmail.com/huydo189", string(data))
+		//MQTTService.Publish("/salt.coffee189@gmail.com/huydo189", string(data),false)
 		time.Sleep(100 * time.Second)
 	}
 
