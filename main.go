@@ -1,11 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
-	IM "bitbucket.org/mqttgis/mqtt"
-	mqttcon "bitbucket.org/mqttgis/mqtt/driver"
+	mqttservice "bitbucket.org/mqttgis/core/mqtt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
@@ -13,7 +13,10 @@ import (
 var GPS [10]LatLng
 
 //MQTTService - khai bao MQTT lib
-var MQTTService IM.IMQTTClient
+var MQTTService mqttservice.MQTT
+
+//MQTTService1 - khai bao MQTT lib
+var MQTTService1 mqttservice.MQTT
 
 // LatLng - struct
 type LatLng struct {
@@ -21,21 +24,25 @@ type LatLng struct {
 	LON float64 `json:"lon"`
 }
 
+//Handler message arrived
 func onMessageHandler(client mqtt.Client, message mqtt.Message) {
 	fmt.Printf("Received message on topic: %s\nMessage: %s\n", message.Topic(), message.Payload())
 }
 
 func onConnectHandler(client mqtt.Client) {
+	//put all of your subscriber here - resubcribe when reconnect
 	MQTTService.Subscribe("/salt.coffee189@gmail.com/huydo189", onMessageHandler, 1)
 	MQTTService.Publish("/salt.coffee189@gmail.com/device/phaotieu-xzxc", "Online", true)
 }
 
 //Khởi tạo
 func init() {
-	MQTTService = mqttcon.InitMQTTClientOptions("./config/client.json")
+	MQTTService = mqttservice.InitMQTTClientOptions("./config/client.json")
+	MQTTService1 = mqttservice.InitMQTTClientOptions("./config/client.json")
 }
 
 func main() {
+
 	GPS[0] = LatLng{LAT: 10.445595, LON: 107.186590}
 	GPS[1] = LatLng{LAT: 10.510079, LON: 107.246316}
 	GPS[2] = LatLng{LAT: 10.512941, LON: 107.276870}
@@ -46,12 +53,17 @@ func main() {
 	GPS[7] = LatLng{LAT: 10.496993, LON: 107.277607}
 	GPS[8] = LatLng{LAT: 10.474085, LON: 107.248610}
 	GPS[9] = LatLng{LAT: 10.477209, LON: 107.297322}
+
 	MQTTService.SetOnConnectHandler(onConnectHandler)
+
 	MQTTService.Start()
+
+	MQTTService1.Start()
+
 	MQTTService.Subscribe("/salt.coffee189@gmail.com/huydo189", onMessageHandler, 1)
 	for i := 0; i < 100; i++ {
-		// data, _ := json.Marshal(&GPS[i])
-		//MQTTService.Publish("/salt.coffee189@gmail.com/huydo189", string(data),false)
+		data, _ := json.Marshal(&GPS[i])
+		MQTTService.Publish("/salt.coffee189@gmail.com/huydo189", string(data), false)
 		time.Sleep(100 * time.Second)
 	}
 

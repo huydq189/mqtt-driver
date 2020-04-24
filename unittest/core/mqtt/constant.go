@@ -1,7 +1,7 @@
 package mqtt
 
 import (
-	mqttconn "bitbucket.org/mqttgis/mqtt/driver"
+	mqttservice "bitbucket.org/mqttgis/core/mqtt"
 )
 
 //Test - struct
@@ -14,14 +14,28 @@ type Test struct {
 var pathconfig = `../../../config/client.json`
 
 //MQTTService - test MQService
-var MQTTService = mqttconn.InitMQTTClientOptions(pathconfig)
+var MQTTService = mqttservice.InitMQTTClientOptions(pathconfig)
 
-//MQ - test MQService
-var MQ = mqttconn.Init(pathconfig)
+//MQTTService1 - test MQService
+var MQTTService1 = mqttservice.InitMQTTClientOptions(pathconfig)
 
-//Value - test
-var Value = Test{
+//Value1 - test
+var Value1 = Test{
 	Topic:   "/salt.coffee189@gmail.com/test",
 	Qos:     0,
 	Message: "Hello from the other side",
+}
+
+//Value2 - test
+var Value2 = Test{
+	Topic:   "/salt.coffee189@gmail.com/test",
+	Qos:     1,
+	Message: "It's over 9000!",
+}
+
+//Value3 - test
+var Value3 = Test{
+	Topic:   "/salt.coffee189@gmail.com/test",
+	Qos:     2,
+	Message: `{"car":"BWM i8"}`,
 }
